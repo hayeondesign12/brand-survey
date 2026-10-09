@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>브랜드 지향점 설문</title>
+<style>
+  :root{
+    --ink:#111; --muted:#6b6b6b; --line:#d9d9d9; --accent:#111; --bg:#fff; --soft:#f4f4f4;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;}
+  .wrap{max-width:980px;margin:0 auto;padding:48px 20px 80px}
+  h1{font-size:28px;text-align:center;margin:0 0 32px;font-weight:800;letter-spacing:-.02em}
+  .info{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:28px}
+  .info input{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:15px}
+  .table{border-top:2px solid #bbb}
+  .row{display:grid;grid-template-columns:1.2fr repeat(5,1fr) 1.2fr;align-items:center;
+    border-bottom:1px solid var(--line);padding:22px 0}
+  .row.error{background:#fff4f2}
+  .lbl{font-weight:700;font-size:20px;padding:0 16px}
+  .lbl.r{text-align:right}
+  .opt{display:flex;justify-content:center}
+  .opt input{position:absolute;opacity:0;pointer-events:none}
+  .opt label{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:22px;cursor:pointer;border:1.5px solid transparent;transition:.12s;user-select:none}
+  .opt label:hover{background:var(--soft)}
+  .opt input:checked + label{background:var(--accent);color:#fff}
+  .opt input:focus-visible + label{outline:2px solid #3b82f6;outline-offset:2px}
+  .section{margin-top:40px}
+  .section h2{font-size:20px;margin:0 0 6px}
+  .section p{margin:0 0 14px;color:var(--muted);font-size:14px}
+  .drop{border:2px dashed #bbb;border-radius:12px;padding:28px;text-align:center;cursor:pointer;background:#fafafa}
+  .drop.over{background:var(--soft);border-color:#666}
+  .drop strong{display:block;margin-bottom:4px}
+  .drop small{color:var(--muted)}
+  #fileInput{display:none}
+  .files{margin-top:12px;font-size:14px}
+  .files div{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--soft);border-radius:8px;margin-top:6px}
+  .files button{border:0;background:none;color:#c00;cursor:pointer;font-size:13px}
+  textarea{width:100%;min-height:90px;margin-top:16px;padding:12px 14px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:15px;resize:vertical}
+  .actions{margin-top:36px;text-align:center}
+  #saveBtn{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:16px 56px;font-size:18px;font-weight:700;cursor:pointer}
+  #saveBtn:disabled{opacity:.5;cursor:default}
+  #msg{margin-top:16px;font-size:15px;min-height:22px}
+  #msg.ok{color:#0a7a3d} #msg.err{color:#c00}
+  #fallback{display:none;margin-top:10px}
+  #fallback button{background:none;border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer;font:inherit;font-size:14px}
+  @media(max-width:640px){
+    .wrap{padding:28px 10px 60px}
+    h1{font-size:21px}
+    .info{grid-template-columns:1fr}
+    .row{grid-template-columns:repeat(5,1fr);row-gap:10px;padding:16px 0}
+    .lbl{grid-column:span 5;font-size:16px;padding:0 8px;text-align:left}
+    .lbl.l{order:-2} .lbl.r{order:10;text-align:right}
+    .lbl.l::after{content:""}
+    .opt label{width:44px;height:44px;font-size:18px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>우리 브랜드는 어떤 모습을 지향하나요?</h1>
+
+  <div class="info">
+    <input id="name" placeholder="이름 / 회사명 (선택)">
+    <input id="contact" placeholder="연락처 또는 이메일 (선택)">
+  </div>
+
+  <form id="form" novalidate>
+    <div class="table" id="table"></div>
+
+    <div class="section">
+      <h2>기획안 첨부</h2>
+      <p>준비하신 기획안이 있다면 첨부해주세요. (PDF, PPT, DOC, 이미지 등 / 파일당 최대 5MB)</p>
+      <div class="drop" id="drop">
+        <strong>클릭하거나 파일을 끌어다 놓으세요</strong>
+        <small>여러 파일 첨부 가능</small>
+      </div>
+      <input type="file" id="fileInput" multiple>
+      <div class="files" id="files"></div>
+      <textarea id="comment" placeholder="기획안에 대한 추가 의견이 있다면 적어주세요 (선택)"></textarea>
+    </div>
+
+    <div class="actions">
+      <button type="submit" id="saveBtn">저장</button>
+      <div id="msg" role="status"></div>
+      <div id="fallback"><button type="button" id="dlBtn">응답 내용 파일로 내려받기</button></div>
+    </div>
+  </form>
+</div>
+
+<script>
+// ▼▼▼ 결과를 받을 이메일 주소를 여기에 입력하세요 ▼▼▼
+const RECEIVER_EMAIL = "hayeon_y@naver.com";
+// ▲▲▲ ----------------------------------------- ▲▲▲
+
+const MAX_FILE_MB = 5;
+
+const PAIRS = [
+  ["일관된","변화하는"],["한결같은","확장하는"],["정적인","역동적인"],
+  ["감성적인","이성적인"],["실용적인","예술적인"],["합리적인","프리미엄"],
+  ["대중적인","희소성 있는"],["고전적인","진취적인"]
+];
+
+const table = document.getElementById("table");
+PAIRS.forEach(([a,b],i)=>{
+  const row = document.createElement("div");
+  row.className = "row"; row.dataset.idx = i;
+  let h = `<div class="lbl l">${a}</div>`;
+  for(let n=1;n<=5;n++){
+    h += `<div class="opt"><input type="radio" name="q${i}" id="q${i}_${n}" value="${n}">
+          <label for="q${i}_${n}">${n}</label></div>`;
+  }
+  h += `<div class="lbl r">${b}</div>`;
+  row.innerHTML = h;
+  table.appendChild(row);
+});
+
+// 파일 처리
+let selected = [];
+const drop = document.getElementById("drop"), fileInput = document.getElementById("fileInput"), filesEl = document.getElementById("files");
+drop.onclick = ()=>fileInput.click();
+fileInput.onchange = e=>{ addFiles(e.target.files); fileInput.value=""; };
+["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over")}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over")}));
+drop.addEventListener("drop",e=>addFiles(e.dataTransfer.files));
+function addFiles(list){
+  for(const f of list){
+    if(f.size > MAX_FILE_MB*1024*1024){ alert(`${f.name}: ${MAX_FILE_MB}MB를 초과하여 첨부할 수 없습니다.`); continue; }
+    selected.push(f);
+  }
+  renderFiles();
+}
+function renderFiles(){
+  filesEl.innerHTML = "";
+  selected.forEach((f,i)=>{
+    const d = document.createElement("div");
+    d.innerHTML = `<span>${f.name} (${(f.size/1024/1024).toFixed(2)}MB)</span>`;
+    const b = document.createElement("button"); b.type="button"; b.textContent="삭제";
+    b.onclick = ()=>{ selected.splice(i,1); renderFiles(); };
+    d.appendChild(b); filesEl.appendChild(d);
+  });
+}
+
+function collect(){
+  const answers = PAIRS.map(([a,b],i)=>{
+    const c = document.querySelector(`input[name=q${i}]:checked`);
+    return {pair:`${a} ↔ ${b}`, score: c ? Number(c.value) : null};
+  });
+  return answers;
+}
+
+const msg = document.getElementById("msg"), btn = document.getElementById("saveBtn");
+let lastText = "";
+
+document.getElementById("form").addEventListener("submit", async e=>{
+  e.preventDefault();
+  msg.className=""; msg.textContent="";
+  document.getElementById("fallback").style.display="none";
+
+  const answers = collect();
+  let firstMissing = null;
+  document.querySelectorAll(".row").forEach((r,i)=>{
+    const miss = answers[i].score===null;
+    r.classList.toggle("error", miss);
+    if(miss && !firstMissing) firstMissing = r;
+  });
+  if(firstMissing){
+    firstMissing.scrollIntoView({behavior:"smooth",block:"center"});
+    msg.className="err"; msg.textContent="아직 응답하지 않은 문항이 있어요.";
+    return;
+  }
+
+  if(RECEIVER_EMAIL.includes("example.com")){
+    msg.className="err"; msg.textContent="받을 이메일 주소가 아직 설정되지 않았습니다. (관리자 설정 필요)";
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append("_subject","[브랜드 설문] 새 응답이 도착했습니다");
+  fd.append("_template","table");
+  fd.append("_captcha","false");
+  fd.append("이름/회사명", document.getElementById("name").value || "(미입력)");
+  fd.append("연락처", document.getElementById("contact").value || "(미입력)");
+  answers.forEach(a=>fd.append(a.pair, a.score));
+  fd.append("추가의견", document.getElementById("comment").value || "(없음)");
+  selected.forEach((f,i)=>fd.append("attachment", f, f.name));
+
+  lastText = `이름/회사명: ${document.getElementById("name").value}\n연락처: ${document.getElementById("contact").value}\n\n`
+    + answers.map(a=>`${a.pair}: ${a.score}`).join("\n")
+    + `\n\n추가의견: ${document.getElementById("comment").value}\n첨부: ${selected.map(f=>f.name).join(", ") || "없음"}`;
+
+  btn.disabled = true; btn.textContent = "전송 중...";
+  try{
+    const res = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(RECEIVER_EMAIL)}`,{
+      method:"POST", body:fd, headers:{Accept:"application/json"}
+    });
+    const data = await res.json().catch(()=>({}));
+    if(res.ok && (data.success===true || data.success==="true")){
+      msg.className="ok"; msg.textContent="응답이 저장되어 전송되었습니다. 감사합니다!";
+      document.getElementById("form").reset(); selected=[]; renderFiles();
+    }else{
+      throw new Error(data.message || "전송 실패");
+    }
+  }catch(err){
+    msg.className="err";
+    msg.textContent="전송에 실패했습니다. 잠시 후 다시 시도해주세요. ("+err.message+")";
+    document.getElementById("fallback").style.display="block";
+  }finally{
+    btn.disabled=false; btn.textContent="저장";
+  }
+});
+
+document.getElementById("dlBtn").onclick = ()=>{
+  const blob = new Blob([lastText],{type:"text/plain;charset=utf-8"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = "brand-survey-response.txt"; a.click();
+};
+</script>
+</body>
+</html>
